@@ -1,6 +1,14 @@
+import { isAuthenticated } from "@/lib/actions/auth.action";
 import Image from "next/image";
+import { redirect } from "next/navigation";
 
-const RootLayout = ({ children }: Readonly<{ children: React.ReactNode }>) => {
+const RootLayout = async ({
+  children,
+}: Readonly<{ children: React.ReactNode }>) => {
+  const isUserAuthenticated = await isAuthenticated();
+
+  if (!isUserAuthenticated) redirect("/sign-in");
+
   return (
     <div className="py-10 px-22">
       <div className="flex justify-between gap-2 py-5 mb-10">

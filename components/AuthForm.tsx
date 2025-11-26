@@ -10,6 +10,13 @@ import { Input } from "./ui/input";
 import { Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
+import { auth } from "@/firebase/client";
+import { signIn, signUp } from "@/lib/actions/auth.action";
+import { toast } from "sonner";
 
 const authFormSchema = (type: FormType) =>
   z.object({
@@ -41,12 +48,53 @@ const AuthForm = ({ type }: { type: FormType }) => {
     },
   });
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
       if (type === "sign-up") {
-        // sonner success toast needs to add
+        const { fullname, email, password } = data;
+
+        const userCredentials = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+
+        const result = await signUp({
+          uid: userCredentials.user.uid,
+          name: fullname!,
+          email,
+          password,
+        });
+
+        if (!result?.success) {
+          toast.error(result?.message);
+          return;
+        }
+
+        toast.success("Account created successfully. Please sign in.");
         router.push("/sign-in");
       } else {
+        const { email, password } = data;
+
+        const userCredential = await signInWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+
+        const idToken = await userCredential.user.getIdToken();
+
+        if (!idToken) {
+          toast.error("Sign in Failed");
+          return;
+        }
+
+        await signIn({
+          email,
+          idToken,
+        });
+
+        toast.success("Sign in successfully.");
         router.push("/");
       }
     } catch (error) {
@@ -112,47 +160,12 @@ const AuthForm = ({ type }: { type: FormType }) => {
                   render={({ field }) => (
                     <FormItem className="gap-2">
                       <FormLabel>{fieldConfig.label}</FormLabel>
-                      <FormControl
-                        className={cn(
-                          fieldConfig.type !== "file" &&
-                            "focus-visible:ring-1 focus-visible:ring-input border-input rounded-full p-6 flex items-center justify-center bg-[#27282F]"
-                        )}
-                      >
-                        {fieldConfig.type === "file" ? (
-                          <div>
-                            <label
-                              htmlFor={fieldConfig.name}
-                              className="w-full flex items-center gap-2 justify-center cursor-pointer bg-[#27282F] rounded-full py-4 px-6 border border-input hover:ring-1 transition"
-                            >
-                              <Upload size={18} />
-                              <span className="text-sm text-gray-300">
-                                {field.value
-                                  ? field.value.name
-                                  : fieldConfig.placeholder}
-                              </span>
-                            </label>
-
-                            <input
-                              id={fieldConfig.name}
-                              type="file"
-                              className="hidden"
-                              accept={
-                                fieldConfig.name === "profilePicture"
-                                  ? "image/*"
-                                  : ".pdf"
-                              }
-                              onChange={(e) =>
-                                field.onChange(e.target.files?.[0])
-                              }
-                            />
-                          </div>
-                        ) : (
-                          <Input
-                            placeholder={fieldConfig.placeholder}
-                            type={fieldConfig.type || "text"}
-                            {...field}
-                          />
-                        )}
+                      <FormControl className="focus-visible:ring-1 focus-visible:ring-input border-input input rounded-full p-6 flex items-center justify-center bg-[#27282F]">
+                        <Input
+                          placeholder={fieldConfig.placeholder}
+                          type={fieldConfig.type || "text"}
+                          {...field}
+                        />
                       </FormControl>
                     </FormItem>
                   )}
